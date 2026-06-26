@@ -1,39 +1,64 @@
 import json
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict
 
-@dataclass
-class KYCStatus:
-    status: str
-    expires_at: datetime
-
 class PaymentCortex:
-    def __init__(self, kyc_provider_url: str, cache: Dict[str, KYCStatus]):
-        self.kyc_provider_url = kyc_provider_url
-        self.cache = cache
+    @dataclass
+    class Transaction:
+        message_type: str
+        amount: float
+        sender: str
+        recipient: str
 
-    def get_kyc_status(self, customer_id: str) -> KYCStatus:
-        if customer_id in self.cache:
-            kyc_status = self.cache[customer_id]
-            if kyc_status.expires_at > datetime.now():
-                return kyc_status
+    def __init__(self):
+        self.audit_logs = []
+        self.settlement_networks = {
+            "SWIFT": self.process_swift,
+            "SEPA": self.process_sepa
+        }
 
-        # Simulate REST API call to KYC provider
-        kyc_status = KYCStatus("verified", datetime.now() + timedelta(hours=24))
-        self.cache[customer_id] = kyc_status
-        return kyc_status
-
-    def validate_kyc(self, customer_id: str, transaction: Dict[str, str]) -> bool:
-        kyc_status = self.get_kyc_status(customer_id)
-        if kyc_status.status != "verified":
-            raise ValueError("KYC status is not verified")
+    def validate_message(self, message: Dict) -> bool:
+        if message["type"] not in ["SWIFT_MT103", "SEPA_Credit_Transfer"]:
+            return False
+        if message["amount"] <= 0:
+            return False
         return True
 
-    def process_transaction(self, customer_id: str, transaction: Dict[str, str]) -> bool:
+    def process_swift(self, transaction: 'PaymentCortex.Transaction'):
+        # Simulate processing SWIFT transaction
+        return f"SWIFT transaction processed: {transaction.amount} from {transaction.sender} to {transaction.recipient}"
+
+    def process_sepa(self, transaction: 'PaymentCortex.Transaction'):
+        # Simulate processing SEPA transaction
+        return f"SEPA transaction processed: {transaction.amount} from {transaction.sender} to {transaction.recipient}"
+
+    def route_transaction(self, message: Dict) -> str:
+        if not self.validate_message(message):
+            raise ValueError("Invalid message")
+        transaction = PaymentCortex.Transaction(
+            message_type=message["type"],
+            amount=message["amount"],
+            sender=message["sender"],
+            recipient=message["recipient"]
+        )
+        if message["type"] == "SWIFT_MT103":
+            return self.settlement_networks["SWIFT"](transaction)
+        elif message["type"] == "SEPA_Credit_Transfer":
+            return self.settlement_networks["SEPA"](transaction)
+
+    def persist_audit_log(self, message: Dict, result: str):
+        self.audit_logs.append({
+            "timestamp": datetime.now().isoformat(),
+            "message": message,
+            "result": result
+        })
+
+    def process_message(self, message: Dict) -> str:
         try:
-            self.validate_kyc(customer_id, transaction)
-            return True
-        except ValueError as e:
-            print(f"Error: {e}")
-            return False
+            result = self.route_transaction(message)
+            self.persist_audit_log(message, result)
+            return result
+        except Exception as e:
+            self.persist_audit_log(message, str(e))
+            raise
