@@ -1,0 +1,48 @@
+## 📄 `user-stories.md`
+
+### Epic 1 – **On‑boarding & Connectivity**
+| # | User Story (Connextra) | Acceptance Criteria | Complexity |
+|---|------------------------|---------------------|------------|
+| 1.1 | **As a** Payments Operations Manager, **I want** to provision a new partner bank in the platform via a guided wizard, **so that** I can start routing transactions within minutes. | - Wizard validates partner’s SWIFT/BIC and legal entity data.<br>- Generates API credentials (client‑id/secret) and optional X‑509 certs.<br>- Sends automated onboarding email with sandbox credentials.<br>- Shows real‑time status (Pending → Approved → Active).<br>- All data stored encrypted at rest and logged for audit. | **M** |
+| 1.2 | **As a** Integration Engineer, **I want** a Swagger/OpenAPI spec and SDKs (Python, Java, Go) for the Payment Cortex API, **so that** I can integrate my internal systems with minimal code. | - API spec includes auth, payment‑initiation, status‑query, refund, and webhook registration.<br>- SDKs generate compile‑time errors for missing required fields.<br>- Example project for each language that runs end‑to‑end against sandbox.<br>- Docs versioned and auto‑published on every release.<br>- CI pipeline validates spec against test suite on PR. | **S** |
+| 1.3 | **As a** Compliance Officer, **I want** to upload and manage AML/KYC rule sets per jurisdiction, **so that** the engine can enforce local regulatory checks automatically. | - UI to upload JSON/YAML rule definitions with versioning.<br>- Rules can reference fields: sender/receiver country, amount, currency, sanctions list.<br>- Real‑time validation that a rule file is syntactically correct before activation.<br>- Ability to toggle rule sets on/off per corridor.<br>- Audit log of rule changes with user, timestamp, and diff. | **M** |
+| 1.4 | **As a** Product Owner, **I want** a multi‑tenant dashboard that shows health metrics (throughput, latency, error rate) per partner, **so that** I can monitor SLA compliance. | - Dashboard displays per‑tenant charts for TPS, 99‑p99 latency, and failure reasons.<br>- Configurable alert thresholds (e.g., latency > 250 ms triggers Slack/Webhook).<br>- Exportable CSV/JSON reports for any time window.<br>- Role‑based view: admin sees all tenants; partner sees only theirs.<br>- Data retention policy configurable (30‑365 days). | **L** |
+
+---
+
+### Epic 2 – **Transaction Lifecycle & Reliability**
+| # | User Story (Connextra) | Acceptance Criteria | Complexity |
+|---|------------------------|---------------------|------------|
+| 2.1 | **As a** Front‑Office Trader, **I want** to initiate a cross‑border payment with a single API call, **so that** the transaction is queued instantly and I receive a reference ID. | - `POST /payments` returns a UUID reference within 200 ms.<br>- Request payload supports multiple currencies, conversion rates, and optional memo.<br>- System validates required fields and returns descriptive error codes.<br>- Transaction is persisted with ACID guarantees before returning ID.<br>- Idempotency key header prevents duplicate submissions. | **S** |
+| 2.2 | **As a** Settlement Engineer, **I want** the platform to automatically retry failed legs using exponential back‑off, **so that** transient network or partner outages don’t cause permanent failures. | - Retry policy configurable per corridor (max attempts, back‑off schedule).<br>- Each retry logs attempt number, timestamp, and error cause.<br>- After max attempts, transaction moves to “Manual Review” queue.<br>- Successes update original transaction status to `Completed` and emit webhook.<br>- Dashboard shows retry statistics per corridor. | **M** |
+| 2.3 | **As a** Risk Analyst, **I want** real‑time risk scoring on each payment (based on amount, geography, velocity), **so that** high‑risk transactions are flagged before settlement. | - Scoring engine runs synchronously within 100 ms of request receipt.<br>- Scores 0‑100 with configurable thresholds (e.g., >80 → `Review`).<br>- Flagged transactions are routed to a manual‑review queue and not auto‑settled.<br>- Score and rule details stored in audit log.<br>- Ability to override score via admin UI (with justification). | **M** |
+| 2.4 | **As a** Reconciliation Lead, **I want** an immutable ledger of every state transition (initiated, pending, settled, failed, refunded), **so that** I can produce audit‑ready reports. | - Ledger entries are written to append‑only, tamper‑evident storage (e.g., Merkle‑tree backed DB).<br>- Each entry includes timestamp, actor, and cryptographic hash of previous entry.<br>- Export API supports CSV/JSON for any date range.<br>- Ledger can be queried by transaction ID, partner, or status.<br>- System can generate a signed SHA‑256 hash of a report for third‑party verification. | **L** |
+
+---
+
+### Epic 3 – **Security, Compliance & Governance**
+| # | User Story (Connextra) | Acceptance Criteria | Complexity |
+|---|------------------------|---------------------|------------|
+| 3.1 | **As a** Security Engineer, **I want** mutual TLS (mTLS) authentication for all partner‑to‑platform connections, **so that** traffic is encrypted and only authorized entities can call APIs. | - Platform presents server cert signed by Axentx CA.<br>- Partners upload client certs (PEM) via UI; system validates chain.<br>- API rejects connections without valid client cert.<br>- Certificate rotation UI supports scheduled rollover.<br>- All traffic logged with TLS version/cipher suite. | **M** |
+| 3.2 | **As a** Data Privacy Officer, **I want** data‑at‑rest encryption with per‑tenant keys, **so that** a breach in one tenant does not expose another’s data. | - Each tenant gets a unique AES‑256‑GCM key derived from KMS.<br>- Keys are never stored in plaintext; only encrypted blobs in DB.<br>- Encryption/decryption transparent to application layer.<br>- Rotation API rotates tenant key without downtime.<br>- Compliance report shows encryption status per tenant. | **L** |
+| 3.3 | **As a** Auditor, **I want** role‑based access control (RBAC) with fine‑grained permissions (read/write/execute) on all resources, **so that** principle of least privilege is enforced. | - Roles: SuperAdmin, TenantAdmin, Ops, Viewer.<br>- Permissions matrix documented and enforced at API gateway.<br>- UI shows effective permissions for logged‑in user.<br>- All privileged actions require MFA and are logged with user, time, and IP.<br>- Ability to export permission audit trail. | **M** |
+| 3.4 | **As a** Compliance Manager, **I want** automated generation of SAR (Suspicious Activity Report) payloads when a transaction exceeds regulatory thresholds, **so that** we can submit them to authorities within mandated time windows. | - Thresholds configurable per jurisdiction (amount, frequency, country risk).<br>- When triggered, system creates a SAR JSON package with required fields (transaction ID, parties, amount, reason).<br>- SAR is queued to a secure outbound channel (SFTP/HTTPS) with receipt acknowledgment.<br>- Dashboard shows pending, sent, and acknowledged SARs.<br>- Retains SARs for 7 years per regulation. | **L** |
+
+---
+
+### Epic 4 – **Extensibility & Ecosystem**
+| # | User Story (Connextra) | Acceptance Criteria | Complexity |
+|---|------------------------|---------------------|------------|
+| 4.1 | **As a** FinTech Partner, **I want** to register custom webhook endpoints for payment status updates, **so that** my internal systems stay in sync automatically. | - UI to add/edit webhook URL, secret, and event filters (e.g., `payment.completed`).<br>- System signs each payload with HMAC‑SHA256 using stored secret.<br>- Retries on 5xx/timeout with exponential back‑off (max 5 attempts).<br>- Dashboard shows delivery logs (status, latency, response code).<br>- Ability to disable/enable per webhook. | **S** |
+| 4.2 | **As a** Marketplace Builder, **I want** a plug‑in framework to add new settlement rails (e.g., Ripple, SEPA, ACH) without redeploying the core service, **so that** we can expand coverage quickly. | - Plug‑in interface defined in Go (Init, Process, Reconcile).<br>- Plug‑ins packaged as Docker images and discovered via registry.<br>- Core loads plug‑in at runtime and validates contract compliance.<br>- Versioning of plug‑ins with rollback capability.<br>- Monitoring shows plug‑in health and processing latency. | **L** |
+| 4.3 | **As a** Business Analyst, **I want** a self‑service analytics sandbox where I can run SQL‑like queries over anonymized transaction data, **so that** I can derive insights without requesting engineering resources. | - Data lake exports de‑identified transaction fields nightly to a ClickHouse cluster.<br>- UI provides query editor with autocomplete and result visualizations.<br>- Row‑level security ensures analysts only see their tenant’s data.<br>- Query execution limited to 5 minutes and 10 M rows.<br>- Export to CSV/Excel available. | **M** |
+| 4.4 | **As a** Product Marketing Manager, **I want** a white‑label branding option (logo, colors, domain) for each tenant, **so that** partners can present the service as their own. | - Admin UI allows uploading logo (SVG/PNG ≤ 200 KB) and selecting primary/secondary colors.<br>- Tenant can set custom sub‑domain (e.g., `payments.acme.com`).<br>- All UI components respect tenant branding via CSS variables.<br>- Branding changes propagate without downtime.<br>- Branding settings are stored in tenant metadata and versioned. | **S** |
+
+--- 
+
+**Legend:**  
+- **S** – Small (≤ 2 person‑days)  
+- **M** – Medium (2‑5 person‑days)  
+- **L** – Large (≥ 5 person‑days)  
+
+*These stories are ready for grooming and sprint planning.*
